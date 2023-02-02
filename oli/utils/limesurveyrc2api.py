@@ -1,12 +1,8 @@
 import requests
 import json
 from collections import OrderedDict
-from _overlapped import NULL
-
 
 class LimeSurveyRemoteControl2API(object):
-
-#    def __init__(self, url):
     def __init__(self, config):
         '''
         Takes a config-dictionary as parameter. To create an object of this class 
