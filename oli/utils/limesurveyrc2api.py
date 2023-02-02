@@ -1,19 +1,40 @@
 import requests
 import json
 from collections import OrderedDict
+from _overlapped import NULL
 
 
 class LimeSurveyRemoteControl2API(object):
 
-    def __init__(self, url):
-        self.url = url
-        self.headers = {"content-type": "application/json"}
+#    def __init__(self, url):
+    def __init__(self, config):
+        '''
+        Takes a config-dictionary as parameter. To create an object of this class 
+        the dictionary should at least have Values for Keys api_url, client_id and client_secret
+        '''
+        # default to zero length strings
+        self.url = 'https://api_url.in.config'
+        self.ls_user = ''
+        self.ls_password = ''
+        
+        try:
+            self.url = config['lsUrl']
+            self.ls_user = config['lsUser']
+            self.ls_password = config['lsPassword']
+        except Exception as _error:
+            print(_error)
+            
+        #self.url = url
+        self.headers = {"content-type": "application/json", "connection": "Keep-Alive"}
         self.utils = _Utils(self)
         self.sessions = _Sessions(self)
         self.surveys = _Surveys(self)
         self.tokens = _Tokens(self)
         self.questions = _Questions(self)
         self.responses = _Responses(self)
+        
+        #now try to get a sessionkey with these values
+        self.sessionkey=self.sessions.get_session_key(self.ls_user, self.ls_password)
 
 
 class _Utils(object):
@@ -101,7 +122,8 @@ class _Sessions(object):
         ])
         data = self.api.utils.prepare_params('get_session_key', params)
         response = self.api.utils.request(data)
-        return response
+        this_session_key = response.get('result')
+        return this_session_key
 
     def release_session_key(self, session_key):
         """
@@ -167,7 +189,7 @@ class _Tokens(object):
         response = self.api.utils.request(data)
         return response
 
-    def list_participants(self, session_key, survey_id):
+    def list_participants(self, survey_id, start=0, limit=10000, verbose=False):
         """
         List participants of the specified survey.
         * @access public
@@ -186,18 +208,22 @@ class _Tokens(object):
         :type survey_id: Integer
         """
         params = OrderedDict([
-            ('sSessionKey', session_key),
+            ('sSessionKey', self.api.sessionkey),
             ('iSurveyID', survey_id),
-            ('iStart', 0),
-            ('iLimit', 1000),
+            ('iStart', start),
+            ('iLimit', limit),
             ('bUnused', False),
             ('aAttributes', ('attributes_bit'))
         ])
         # transform into json-format
         data = self.api.utils.prepare_params('list_participants', params)
+        if verbose == True:
+            print(data)
         # but the attributes bit is not well formed, so we manually correct that
         data = data.replace('"attributes_bit"', '["completed"]')
         response = self.api.utils.request(data)
+        if verbose == True:
+            print(response)
         return response
 
     def delete_participants(self, session_key, survey_id, tokens):
@@ -220,8 +246,58 @@ class _Tokens(object):
         data = self.api.utils.prepare_params('delete_participants', params)
         response = self.api.utils.request(data)
         return response
+    
+    def get_response_ids(self, survey_id, token, verbose=True):
+        params = OrderedDict([
+            ('sSessionKey', self.api.sessionkey),
+            ('iSurveyID', survey_id),
+            ('sToken', token)
+        ])
+        data = self.api.utils.prepare_params('get_response_ids', params)
+        if verbose == True:
+            print(data)
+        response = self.api.utils.request(data)
+        return response
+        
 
-
+    def export_response_by_token(self, survey_id, token, verbose=True):
+        """
+        $sSessionKey string
+        $iSurveyID integer
+        $sDocumentType string pdf, csv, xls, doc, json
+        $sToken string
+        $sLanguageCode string
+        $sCompletionStatus string Optional 'complete','incomplete' or 'all' - defaults to 'all'
+        $sHeadingType string 'code','full' or 'abbreviated' Optional defaults to 'code'
+        $sResponseType string 'short' or 'long' Optional defaults to 'short'
+        $aFields array Optional Selected fields   
+        
+        "params": { "sSessionKey": "%s",
+                                    "iSurveyID":  %s,
+                                    "sDocumentType": "json",
+                                    "sToken":  "%s",
+                                    "$sLanguageCode": "%s",
+                                    "sCompletationStatus": "all",
+                                    "sHeadingType": "code",
+                                    "sResponseType": "long"
+        """
+        #$sSessionKey, $iSurveyID, 'json', $sToken, null, 'all', 'code', 'long')
+        params = OrderedDict([
+            ('sSessionKey', self.api.sessionkey),
+            ('iSurveyID', survey_id),
+            ('sDocumentType', 'json'),
+            ('sToken', token),
+            ('sLanguageCode', 'en'),
+            ('sCompletationStatus', 'all'),
+            ('sHeadingType', 'code'),
+            ('sResponseType', 'short')
+        ])
+        data = self.api.utils.prepare_params('export_responses_by_token', params)
+        if verbose == True:
+            print(data)
+        response = self.api.utils.request(data)
+        return response
+    
 class _Questions(object):
 
     def __init__(self, lime_survey_api):
@@ -258,7 +334,7 @@ class _Responses(object):
     def __init__(self, lime_survey_api):
         self.api = lime_survey_api
 
-    def export_responses(self, session_key, survey_id,
+    def export_responses(self, survey_id,
                        document_type='json', language='en'):
         """
         Return a list of questions from the specified survey.
@@ -275,7 +351,7 @@ class _Responses(object):
         """
 
         params = OrderedDict([
-            ('sSessionKey', session_key),
+            ('sSessionKey', self.api.sessionkey),
             ('iSurveyID', survey_id),
             ('sDocumentType', document_type),
             ('sLanguage', language)

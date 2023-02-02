@@ -2,7 +2,6 @@
 To connect to postgresql database as defined in oli.config
 Read subjects and write subjects
 Created on 14 apr. 2017
-
 @author: GerbenRienk
 '''
 import psycopg2
@@ -116,13 +115,15 @@ class ConnToOliDB(object):
         self._conn.commit()
         return None
         
-    def WriteStudySubjectID(self, sid, response_id, study_subject_id):
+    def WriteStudySubjectID(self, sid, response_id, study_subject_id, verbose=False):
         """ 
         Method to write study_subject_id to table ls_responses
         """
         cursor = self._conn.cursor()  
         
         sql_statement = """Update ls_responses set study_subject_id='%s' where sid=%i and response_id=%i""" % (study_subject_id, sid, response_id)
+        if verbose:
+            print('WriteStudySubjectID: %s' % sql_statement)
         try:
             cursor.execute(sql_statement)
         except:
@@ -131,7 +132,7 @@ class ConnToOliDB(object):
         self._conn.commit()
         return None
 
-    def WriteStudySubjectOID(self, sid, response_id, study_subject_oid):
+    def WriteStudySubjectOID(self, sid, response_id, study_subject_oid, verbose=False):
         """ 
         Method to write study_subject_oid to table ls_responses
         """
@@ -140,6 +141,8 @@ class ConnToOliDB(object):
         # only try to set the study_subject_oid is we have been given one
         if (study_subject_oid is not None):
             sql_statement = """Update ls_responses set study_subject_oid='%s' where sid=%i and response_id=%i""" % (study_subject_oid, sid, response_id)
+            if verbose:
+                print('WriteStudySubjectOID: %s' % sql_statement)
             try:
                 cursor.execute(sql_statement)
             except:
@@ -153,10 +156,13 @@ class ConnToOliDB(object):
         Method to write study_subject_oid to table ls_responses
         """
         cursor = self._conn.cursor()  
+        # escape the single quotes
+        data_ws_request = data_ws_request.replace("'", "''")
         #print("in WriteDataWSRequest: ", str(sid), str(response_id), data_ws_request)
         sql_statement = """Update ls_responses set data_ws_request='%s' where sid=%i and response_id=%i""" % (data_ws_request, sid, response_id)
         try:
             cursor.execute(sql_statement)
+            #print('after sql execute: %s' % sql_statement)
         except:
             print ("WriteDataWSRequest: not able to execute: ", sql_statement)
         
@@ -169,12 +175,13 @@ class ConnToOliDB(object):
         """
         cursor = self._conn.cursor()  
         #print("in WriteDataWSResponse: ", str(sid), str(response_id), data_ws_response)
-        sql_statement = "Update ls_responses set data_ws_response='%s' where sid=%i and response_id=%i" % (data_ws_response, sid, response_id)
+        data_ws_response = data_ws_response.replace("'", "''")
+        sql_statement = """Update ls_responses set data_ws_response='%s' where sid=%i and response_id=%i""" % (data_ws_response, sid, response_id)
         try:
             cursor.execute(sql_statement)
         except:
             print ("WriteDataWSResponse: not able to execute: ", sql_statement)
-            print("for %i-%i" % (sid, response_id))
+        
         self._conn.commit()
         return None
 
@@ -188,13 +195,13 @@ class PGSubject(object):
         self._studysubjectid = PGStudySubjectID
         return
     
-    def GetSSOID(self):
+    def GetSSOID(self, verbose=False):
         'method to get the StudySubjectOID using rest'
         import requests
         import xml.etree.ElementTree as ET
         config=readDictFile('oli.config')
         
-        login_url = config['baseUrlRest'] + 'j_spring_security_check'
+        login_url = config['baseUrlRest'] + '/j_spring_security_check'
         login_action = {'action':'submit'}
         login_payload = {
             'j_username': config['userName'],
@@ -203,21 +210,25 @@ class PGSubject(object):
                         }
         mySession = requests.Session()
         mySession.post(login_url,params=login_action,data=login_payload)
-        cd_url = config['baseUrlRest'] + 'rest/clinicaldata/xml/view/' + config['studyOid'] + '/'
+        cd_url = config['baseUrlRest'] + '/rest/clinicaldata/xml/view/' + config['studyOid'] + '/'
         cd_url = cd_url + self._studysubjectid + '/*/*'
-        #print(cd_url)
+        if verbose:
+            print('GetSSOID using url %s' % cd_url)
         rest_response = mySession.get(cd_url)
         # only analyze the response, if the status code was 200 
         if(rest_response.status_code == 200):
             document = rest_response.content
+            if verbose:
+                print('response is %s' % document)
+            
             root = ET.fromstring(document)
                         
             for clinical_data in root.findall('{http://www.cdisc.org/ns/odm/v1.3}ClinicalData/'):
+                #print(clinical_data)
                 subject_info = clinical_data.attrib
                 if subject_info['{http://www.openclinica.org/ns/odm_ext_v130/v3.1}StudySubjectID'] == self._studysubjectid:
                     return subject_info['SubjectKey']
-        else:
-            print('unexpected status %i when submitting %s' % (rest_response.status_code, cd_url))
+
 
 
 if __name__ == "__main__":
