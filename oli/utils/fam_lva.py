@@ -63,10 +63,10 @@ def compose_odm(study_subject_oid, data_ls, verbose=False):
     # opening tags
     _odm_data = ''
     _odm_data = _odm_data + '<ODM>'
-    _odm_data = _odm_data + '  <ClinicalData StudyOID="S_CDLTV">'
+    _odm_data = _odm_data + '  <ClinicalData StudyOID="S_CPLVA">'
     _odm_data = _odm_data + '    <SubjectData SubjectKey="' + study_subject_oid + '">'
-    _odm_data = _odm_data + '      <StudyEventData StudyEventOID="SE_LTV_CD">'
-    _odm_data = _odm_data + '        <FormData FormOID="F_LVFAMILYFORM_V01">'
+    _odm_data = _odm_data + '      <StudyEventData StudyEventOID="SE_LVA_CP">'
+    _odm_data = _odm_data + '        <FormData FormOID="F_LVFAMILYFORM_V10">'
     _odm_data = _odm_data + '          <ItemGroupData ItemGroupOID="IG_LVFAM_UNGROUPED" ItemGroupRepeatKey="1" TransactionType="Insert">'
     # data section 1
     _odm_data = _odm_data + write_odm_line('I_LVFAM_RELATIONSHIP', data_ls['q1relationship'])

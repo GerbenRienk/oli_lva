@@ -37,7 +37,7 @@ def cycle_through_syncs():
     #start the cycling here
     while True:
         # request all tokens
-        all_tokens=api.tokens.list_participants(sid, start=0, limit=11000, verbose=False)
+        all_tokens=api.tokens.list_participants(sid, start=0, limit=100, verbose=False)
         for one_token in all_tokens['result']:
             if not one_token['completed'] == 'N':
                 this_token=one_token['token']
